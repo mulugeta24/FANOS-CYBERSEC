@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>URL Scanner API Test</h1>
+    <input type="text" id="urlInput" value="http://www.municipality-portal.example/index.php?option=com_content&view=article&id=12" style="width: 500px">
+    <button onclick="testScan()">Test Scan</button>
+    <button onclick="testWithTimeout()">Test with Manual Timeout</button>
+    <div id="status"></div>
+    <pre id="result"></pre>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        const TOKEN = localStorage.getItem('token') || 'test-token';
+
+        function log(message) {
+            const status = document.getElementById('status');
+            status.innerHTML += message + '<br>';
+            console.log(message);
+        }
+
+        async function testScan() {
+            const url = document.getElementById('urlInput').value;
+            const resultDiv = document.getElementById('result');
+            const statusDiv = document.getElementById('status');
+            
+            statusDiv.innerHTML = '';
+            resultDiv.innerHTML = '';
+            
+            log('Starting scan...');
+            log('URL: ' + url);
+            log('API: ' + API_URL);
+            
+            try {
+                const response = await fetch(`${API_URL}/scan`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${TOKEN}`
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                log('Response status: ' + response.status);
+                
+                const data = await response.json();
+                log('Response received!');
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                log('ERROR: ' + error.message);
+                resultDiv.textContent = error.stack;
+            }
+        }
+
+        async function testWithTimeout() {
+            const url = document.getElementById('urlInput').value;
+            const resultDiv = document.getElementById('result');
+            const statusDiv = document.getElementById('status');
+            
+            statusDiv.innerHTML = '';
+            resultDiv.innerHTML = '';
+            
+            log('Starting scan with 30s timeout...');
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                log('TIMEOUT! Aborting request...');
+                controller.abort();
+            }, 30000);
+            
+            try {
+                const response = await fetch(`${API_URL}/scan`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${TOKEN}`
+                    },
+                    body: JSON.stringify({ url: url }),
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                log('Response status: ' + response.status);
+                
+                const data = await response.json();
+                log('Response received!');
+                resultDiv.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    log('Request was aborted due to timeout');
+                } else {
+                    log('ERROR: ' + error.message);
+                }
+                resultDiv.textContent = error.stack;
+            }
+        }
+    </script>
+</body>
+</html>
